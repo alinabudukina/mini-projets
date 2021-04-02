@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Add live realtime data</title>
+    <meta
+      name="viewport"
+      content="initial-scale=1,maximum-scale=1,user-scalable=no"
+    />
+    <link
+      href="https://api.mapbox.com/mapbox-gl-js/v2.1.1/mapbox-gl.css"
+      rel="stylesheet"
+    />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.1.1/mapbox-gl.js"></script>
+  </head>
+
+  <body>
+    <script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
+    <!-- html -->
+    <div id="map"></div>
+    <div id="info">
+      <p>
+        The International Space Station is currently over <br />
+        <span id="isslat">?</span>&deg; N, <span id="isslon">?</span>&deg; E
+      </p>
+    </div>
+
+    <!-- style ccs -->
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+      }
+      @import url("https://fonts.googleapis.com/css2?family=Inconsolata:wght@300&display=swap");
+    </style>
+    <style type="text/css">
+      #info {
+        position: relative;
+        left: 300px;
+        margin: 0px auto;
+        width: 30%;
+        padding: 20px;
+        border-radius: 3px;
+        font-family: "Inconsolata", monospace;
+        font-size: 24px;
+        text-align: center;
+        color: #222;
+        background: #fff;
+      }
+    </style>
+
+    <!-- javascript -->
+    <script>
+      function getISS() {
+        $.getJSON(
+          "http://api.open-notify.org/iss-now.json?callback=?",
+          function (data) {
+            var lat = data["iss_position"]["latitude"];
+            var lon = data["iss_position"]["longitude"];
+            $("#isslat").html(Math.round(lat * 1000) / 1000.0);
+            $("#isslon").html(Math.round(lon * 1000) / 1000.0);
+          }
+        );
+        setTimeout(getISS, 3000);
+      }
+      getISS();
+      // set up the map
+      mapboxgl.accessToken =
+        "pk.eyJ1IjoiYWxpbmEtYWxlIiwiYSI6ImNrbW0xZnJ2bjFnNWIyb3BmMXBvdGRscGkifQ.DyeNyPOmBH_1ZyumG9c6fQ";
+      var map = new mapboxgl.Map({
+        container: "map",
+        style: "mapbox://styles/mapbox/streets-v11",
+        zoom: 0,
+      });
+      //url from API about ISS current position
+      var url = "http://api.open-notify.org/iss-now.json";
+      map.on("load", function () {
+        map.loadImage(
+          "https://upload.wikimedia.org/wikipedia/commons/f/f2/ISS_spacecraft_model_1.png",
+          function (error, image) {
+            if (error) throw error;
+            map.addImage("cat", image);
+            map.addSource("point", {
+              type: "geojson",
+              data: {
+                type: "FeatureCollection",
+                features: [
+                  {
+                    type: "Feature",
+                    geometry: {
+                      type: "Point",
+                      coordinates: [0, 0],
+                    },
+                  },
+                ],
+              },
+            });
+            map.addLayer({
+              id: "points",
+              type: "symbol",
+              source: "point",
+              layout: {
+                "icon-image": "cat",
+                "icon-size": 0.05,
+              },
+            });
+          }
+        );
+      });
+      var request = new XMLHttpRequest();
+      window.setInterval(function () {
+        // make a GET request to parse the GeoJSON at the url
+        request.open("GET", url, true);
+        request.onload = function () {
+          if (this.status >= 200 && this.status < 400) {
+            // retrieve the JSON from the response
+            var json = JSON.parse(this.response);
+            // change the IIS API format of JSON to match mapbox format
+            var results = {
+              geometry: {
+                type: "Point",
+                coordinates: [
+                  json.iss_position.longitude,
+                  json.iss_position.latitude,
+                ],
+              },
+              type: "Feature",
+              properties: {},
+            };
+            // update the drone symbol's location on the map
+            map.getSource("point").setData(results);
+            console.log(results);
+            // fly the map to the drone's current location
+            map.flyTo({
+              center: results.geometry.coordinates,
+              speed: 0.5,
+            });
+          }
+        };
+        request.send();
+      }, 2000);
+      // display drone
+
+      //     map.addSource("drone", {
+      //       type: "geojson",
+      //       data: {
+      //         type: "FeatureCollection",
+      //         features: [
+      //           {
+      //             type: "Feature",
+      //             properties: {
+      //               iconSize: [1000, 1000],
+      //             },
+      //             geometry: {
+      //               type: "Point",
+      //               coordinates: [-34.18076066417674, 44.80744711297008],
+      //             },
+      //           },
+      //         ],
+      //       },
+      //     });
+
+      //     map.addLayer({
+      //       id: "drone",
+      //       type: "symbol",
+      //       source: "drone",
+      //       layout: {
+      //         "icon-image": "rocket-15",
+      //         "icon-size": 2,
+      //       },
+      //     });
+      //   });
+    </script>
+  </body>
+</html>
